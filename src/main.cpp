@@ -46,9 +46,20 @@ void setup(){
 	motor.linkDriver(&driver);  // link driver
 	motor.voltage_sensor_align  = 2;                            // aligning voltage
 	motor.foc_modulation        = FOCModulationType::SpaceVectorPWM; // Only with Current Sense
-	motor.controller            = MotionControlType::torque;    // set motion control loop to be used
+	motor.controller            = MotionControlType::velocity_openloop;    // set motion control loop to be used
 	motor.torque_controller     = TorqueControlType::foc_current;
-	motor.voltage_limit 		= driver.voltage_power_supply * 0.58;
+	
+	if (motor.controller == MotionControlType::torque || motor.controller == MotionControlType::angle || motor.controller == MotionControlType::velocity){
+		if (motor.torque_controller == TorqueControlType::foc_current || motor.torque_controller == TorqueControlType::dc_current){
+		// When current sensing is used, reduce the voltage limit to have enough low side ON time for phase current sampling  
+		motor.voltage_limit = driver.voltage_power_supply * 0.54;
+		}else{
+		motor.voltage_limit = driver.voltage_power_supply * 0.58;
+		}
+	}else{
+		// For openloop angle and velocity modes, use very small limit
+		motor.voltage_limit = driver.voltage_power_supply * 0.05;
+	}
 
     SimpleFOCDebug::enable(&rtt);
 	//motor.useMonitoring(rtt);
@@ -60,7 +71,7 @@ void setup(){
 	motor.init();
 
 	// current sense init hardware
-	current_sense.skip_align = true;
+	//current_sense.skip_align = true;
 	current_sense.init();
 	// link the current sense to the motor
 	motor.linkCurrentSense(&current_sense);
@@ -68,6 +79,7 @@ void setup(){
 	// align sensor and start FOC
 	motor.sensor_direction= Direction::CW;
     motor.zero_electric_angle = 0;     // use the real value!
+	motor.motion_downsample = 4;
 	motor.initFOC();
 
 	// set the initial motor target
@@ -79,6 +91,8 @@ void setup(){
 	_delay(100);
 }
 
+float target = 0.1;
+LowPassFilter LPF_target(0.5);  //  the higher the longer new values need to take effect
 
 PhaseCurrent_s currents;
 void loop(){
@@ -95,7 +109,7 @@ void loop(){
 	digitalWrite(LED_BUILTIN, millis()%2000>1000);
 
 	motor.loopFOC();
-	motor.move();
+	motor.move(target);
 	//motor.monitor();
 	command.run();
 
