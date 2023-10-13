@@ -1,5 +1,7 @@
 #include <Arduino.h>
 #include <SimpleFOC.h>
+#include <SimpleFOCDrivers.h>
+#include <encoders/smoothing/SmoothingSensor.h>
 #include <RTTStream.h>
 
 RTTStream rtt;
@@ -11,6 +13,12 @@ BLDCDriver6PWM driver = BLDCDriver6PWM(A_PHASE_UH, A_PHASE_UL, A_PHASE_VH, A_PHA
 // current sensor
 LowsideCurrentSense current_sense = LowsideCurrentSense(0.003, -64.0 / 7.0, A_OP1_OUT, A_OP2_OUT, A_OP3_OUT);
 
+HallSensor sensor = HallSensor(A_HALL1, A_HALL2, A_HALL3,15);
+
+void doA(){ sensor.handleA(); }
+void doB(){ sensor.handleB(); }
+void doC(){ sensor.handleC(); }
+
 // Commander interface constructor
 Commander command = Commander(rtt);
 
@@ -19,6 +27,12 @@ void doMotor(char* cmd){ command.motor(&motor,cmd); }
 
 void setup(){
 	pinMode(LED_BUILTIN, OUTPUT);
+
+	// initialise encoder hardware
+	sensor.init();
+	// hardware interrupt enable
+	sensor.enableInterrupts(doA, doB, doC);
+	motor.linkSensor(&sensor);
 
 	// driver config
 	driver.voltage_power_supply = 26; // 3.6 * BAT_CELLS; // power supply voltage [V]
@@ -46,7 +60,7 @@ void setup(){
 		// For openloop angle and velocity modes, use very small limit
 		motor.voltage_limit = driver.voltage_power_supply * 0.05;
 	}
-    motor.flux_linkage = 0.03;
+    motor.flux_linkage = 0.022;
 
     SimpleFOCDebug::enable(&rtt);
 	//motor.useMonitoring(rtt);
