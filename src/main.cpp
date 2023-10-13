@@ -32,11 +32,21 @@ void setup(){
 	motor.linkDriver(&driver);  // link driver
 	motor.voltage_sensor_align  = 2;                            // aligning voltage
 	motor.foc_modulation        = FOCModulationType::SpaceVectorPWM; // Only with Current Sense
-	motor.controller            = MotionControlType::velocity_openloop;    // set motion control loop to be used
+	motor.controller            = MotionControlType::torque;    // set motion control loop to be used
 	motor.torque_controller     = TorqueControlType::foc_current;
 	
-	motor.voltage_limit = driver.voltage_power_supply * 0.05;
-    motor.flux_linkage = 0.00138;
+	if (motor.controller == MotionControlType::torque || motor.controller == MotionControlType::angle || motor.controller == MotionControlType::velocity){
+		if (motor.torque_controller == TorqueControlType::foc_current || motor.torque_controller == TorqueControlType::dc_current){
+		// When current sensing is used, reduce the voltage limit to have enough low side ON time for phase current sampling  
+		    motor.voltage_limit = driver.voltage_power_supply * 0.54;
+		}else{
+		    motor.voltage_limit = driver.voltage_power_supply * 0.58;
+		}
+	}else{
+		// For openloop angle and velocity modes, use very small limit
+		motor.voltage_limit = driver.voltage_power_supply * 0.05;
+	}
+    motor.flux_linkage = 0.03;
 
     SimpleFOCDebug::enable(&rtt);
 	//motor.useMonitoring(rtt);
@@ -55,10 +65,10 @@ void setup(){
 	motor.linkCurrentSense(&current_sense);
 
 	// align sensor and start FOC
-	//motor.sensor_direction= Direction::CW;
-    //motor.zero_electric_angle = 0;     // use the real value!
+	motor.sensor_direction= Direction::CW;
+    motor.zero_electric_angle = 0;     // use the real value!
 	//motor.motion_downsample = 4;
-	//motor.initFOC();
+	motor.initFOC();
 
 	// set the initial motor target
 	motor.target = 0; // unit depends on control mode 
@@ -69,7 +79,7 @@ void setup(){
 	_delay(100);
 }
 
-float target = 0.01;
+float target = 0;
 LowPassFilter LPF_target(0.5);  //  the higher the longer new values need to take effect
 PhaseCurrent_s currents;
 float angle_el;
@@ -87,28 +97,8 @@ void loop(){
 	}
 	digitalWrite(LED_BUILTIN, millis()%2000>1000);
 
-	//motor.loopFOC();
-	motor.move(target);
+	motor.loopFOC();
+	motor.move(LPF_target(target));
 	//motor.monitor();
 	command.run();
-
-    // read current phase currents
-    motor.PhaseCurrent = current_sense.getPhaseCurrents();
-
-    // calculate clarke transform
-    motor.ABCurrent = current_sense.getABCurrents(motor.PhaseCurrent);
-
-	float Ts = ( _micros() - motor.observer_timestamp) * 1e-6f; 
-	motor.flux_a = _constrain( motor.flux_a + (motor.ABVoltage.alpha - motor.phase_resistance * motor.ABCurrent.alpha) * Ts -
-				motor.phase_inductance * (motor.ABCurrent.alpha - motor.ABCurrent_prev.alpha),-motor.flux_linkage, motor.flux_linkage);
-	motor.flux_b = _constrain( motor.flux_b + (motor.ABVoltage.beta - motor.phase_resistance * motor.ABCurrent.beta) * Ts -
-				motor.phase_inductance * (motor.ABCurrent.beta - motor.ABCurrent_prev.beta) ,-motor.flux_linkage, motor.flux_linkage);
-	motor.ABCurrent_prev = motor.ABCurrent;
-	motor.observer_timestamp = _micros();
-
-	float tmp_angle_el = atan2(motor.flux_b,motor.flux_a);
-	// Handle wraparound
-	tmp_angle_el += tmp_angle_el < 0 ? _2PI : ( tmp_angle_el >= _2PI ? -_2PI : 0 );  
-	angle_el = tmp_angle_el;
-
 }
