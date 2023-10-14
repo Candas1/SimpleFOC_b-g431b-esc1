@@ -60,20 +60,18 @@ void setup(){
 		// For openloop angle and velocity modes, use very small limit
 		motor.voltage_limit = driver.voltage_power_supply * 0.05;
 	}
-    motor.flux_linkage = 0.022;
-
+    
     SimpleFOCDebug::enable(&rtt);
 	//motor.useMonitoring(rtt);
 	motor.monitor_downsample = 100; // set downsampling can be even more > 100
   	motor.monitor_variables =  _MON_VEL;// _MON_CURR_Q | _MON_CURR_D; // set monitoring of d and q currents _MON_TARGET | _MON_VEL | _MON_ANGLE |
 	motor.monitor_decimals = 2; //!< monitor outputs decimal places
     
-
 	// init motor hardware
 	motor.init();
 
 	// current sense init hardware
-	//current_sense.skip_align = true;
+	current_sense.skip_align = true;
 	current_sense.init();
 	// link the current sense to the motor
 	motor.linkCurrentSense(&current_sense);
