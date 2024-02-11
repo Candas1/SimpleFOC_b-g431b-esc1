@@ -1,19 +1,40 @@
 #include <Arduino.h>
 #include <SimpleFOC.h>
 #include <SimpleFOCDrivers.h>
-#include <encoders/flux_observer/FluxObserverSensor.h>
+//#include <encoders/flux_observer/FluxObserverSensor.h>
 #include <RTTStream.h>
 
 RTTStream rtt;
 
 // BLDC motor & driver instance
 BLDCMotor motor = BLDCMotor(15, 0.1664, 17.0, 0.00036858);
-BLDCDriver6PWM driver = BLDCDriver6PWM(A_PHASE_UH, A_PHASE_UL, A_PHASE_VH, A_PHASE_VL, A_PHASE_WH, A_PHASE_WL);
+BLDCDriver6PWM driver = BLDCDriver6PWM( PA8, PC13, PA9, PA12, PA10, PB15);
+
+OPAMP_HandleTypeDef hopamp1;
+OPAMP_HandleTypeDef hopamp2;
+OPAMP_HandleTypeDef hopamp3;
+
+void _configureOPAMP(OPAMP_HandleTypeDef *hopamp, OPAMP_TypeDef *OPAMPx_Def){
+  // could this be replaced with LL_OPAMP calls??
+  hopamp->Instance = OPAMPx_Def;
+  hopamp->Init.PowerMode = OPAMP_POWERMODE_HIGHSPEED;
+  hopamp->Init.Mode = OPAMP_PGA_MODE;
+  hopamp->Init.NonInvertingInput = OPAMP_NONINVERTINGINPUT_IO0;
+  hopamp->Init.InternalOutput = DISABLE;
+  hopamp->Init.TimerControlledMuxmode = OPAMP_TIMERCONTROLLEDMUXMODE_DISABLE;
+  hopamp->Init.PgaConnect = OPAMP_PGA_CONNECT_INVERTINGINPUT_IO0_BIAS;
+  hopamp->Init.PgaGain = OPAMP_PGA_GAIN_16_OR_MINUS_15;
+  hopamp->Init.UserTrimming = OPAMP_TRIMMING_FACTORY;
+  if (HAL_OPAMP_Init(hopamp) != HAL_OK)
+  {
+    SIMPLEFOC_DEBUG("HAL_OPAMP_Init failed!");
+  }
+}
 
 // current sensor
-LowsideCurrentSense current_sense = LowsideCurrentSense(0.003, -64.0 / 7.0, A_OP1_OUT, A_OP2_OUT, A_OP3_OUT);
+LowsideCurrentSense current_sense = LowsideCurrentSense(0.003, -64.0 / 7.0, PA2, _NC, PB1);
 
-FluxObserverSensor sensor = FluxObserverSensor(motor);
+//FluxObserverSensor sensor = FluxObserverSensor(motor);
 
 // Commander interface constructor
 Commander command = Commander(rtt);
@@ -25,7 +46,7 @@ void setup(){
 	pinMode(LED_BUILTIN, OUTPUT);
 
     //sensor.init();
-	motor.linkSensor(&sensor);
+	//motor.linkSensor(&sensor);
 
 	// driver config
 	driver.voltage_power_supply = 18;
@@ -63,6 +84,15 @@ void setup(){
 	// init motor hardware
 	motor.init();
 
+	// Initialize Opamps
+    _configureOPAMP(&hopamp1,OPAMP1);
+	_configureOPAMP(&hopamp2,OPAMP2);
+	_configureOPAMP(&hopamp3,OPAMP3);
+
+	HAL_OPAMP_Start(&hopamp1);
+	HAL_OPAMP_Start(&hopamp2);
+	HAL_OPAMP_Start(&hopamp3);
+
 	// current sense init hardware
 	current_sense.skip_align = true;
 	current_sense.init();
@@ -83,7 +113,7 @@ void setup(){
 	_delay(100);
 }
 
-float target = 0;
+float target = 0.0f;
 LowPassFilter LPF_target(0.5);  //  the higher the longer new values need to take effect
 PhaseCurrent_s currents;
 DQCurrent_s dqcurrents;
@@ -110,13 +140,6 @@ void loop(){
 	//motor.monitor();
 	command.run();
 
-	if (current_sense.initialized){
-		currents = current_sense.getPhaseCurrents();
-		//dqcurrents = current_sense.getFOCCurrents(motor.electrical_angle);
-		//dqcurrents.q = motor.LPF_current_q(dqcurrents.q);
-		//dqcurrents.d = motor.LPF_current_d(dqcurrents.d);
-	
-		dcpower = 1.5f * (motor.current.q * motor.voltage.q) + 0.8 + (0.1664 + 0.003 * motor.current.q * motor.current.q);
-		dccurrent = dcpower / driver.voltage_power_supply; 
-    }
+	if (current_sense.initialized) currents = current_sense.getPhaseCurrents();
 }
+
