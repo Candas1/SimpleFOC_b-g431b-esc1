@@ -7,7 +7,7 @@
 RTTStream rtt;
 
 // BLDC motor & driver instance
-BLDCMotor motor = BLDCMotor(15, 0.1664, 16.0, 0.00036858);
+BLDCMotor motor = BLDCMotor(15, 0.1664, 17.0, 0.00036858);
 BLDCDriver6PWM driver = BLDCDriver6PWM(A_PHASE_UH, A_PHASE_UL, A_PHASE_VH, A_PHASE_VL, A_PHASE_WH, A_PHASE_WL);
 
 // current sensor
@@ -86,6 +86,9 @@ void setup(){
 float target = 0;
 LowPassFilter LPF_target(0.5);  //  the higher the longer new values need to take effect
 PhaseCurrent_s currents;
+DQCurrent_s dqcurrents;
+float dccurrent, dcpower;
+
 float angle_el;
 
 void loop(){
@@ -106,4 +109,14 @@ void loop(){
 	motor.move(LPF_target(target));
 	//motor.monitor();
 	command.run();
+
+	if (current_sense.initialized){
+		currents = current_sense.getPhaseCurrents();
+		//dqcurrents = current_sense.getFOCCurrents(motor.electrical_angle);
+		//dqcurrents.q = motor.LPF_current_q(dqcurrents.q);
+		//dqcurrents.d = motor.LPF_current_d(dqcurrents.d);
+	
+		dcpower = 1.5f * (motor.current.q * motor.voltage.q) + 0.8 + (0.1664 + 0.003 * motor.current.q * motor.current.q);
+		dccurrent = dcpower / driver.voltage_power_supply; 
+    }
 }
