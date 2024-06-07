@@ -6,14 +6,14 @@
 
 RTTStream rtt;
 
-// BLDC motor & driver instance
-BLDCMotor motor = BLDCMotor(15, 0.1664, 17.0, 0.00036858);
+// !!! The Flux Observer needs phase resistance, KV rating and phase inductance parameters to be set
+// !!! It also needs current sense 
+BLDCMotor motor = BLDCMotor(15, 0.1664, 17.0, 0.00036858); // Hoverboard Motor
+FluxObserverSensor sensor = FluxObserverSensor(motor);
 BLDCDriver6PWM driver = BLDCDriver6PWM(A_PHASE_UH, A_PHASE_UL, A_PHASE_VH, A_PHASE_VL, A_PHASE_WH, A_PHASE_WL);
 
 // current sensor
 LowsideCurrentSense current_sense = LowsideCurrentSense(0.003, -64.0 / 7.0, A_OP1_OUT, A_OP2_OUT, A_OP3_OUT);
-
-FluxObserverSensor sensor = FluxObserverSensor(motor);
 
 // Commander interface constructor
 Commander command = Commander(rtt);
@@ -69,9 +69,10 @@ void setup(){
 	// link the current sense to the motor
 	motor.linkCurrentSense(&current_sense);
 
-	// align sensor and start FOC
+	// !!! The flux observer sensor doesn't need sensor alignment
 	motor.sensor_direction= Direction::CW;
     motor.zero_electric_angle = 0;
+
 	motor.initFOC();
 
 	// set the initial motor target
