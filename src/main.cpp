@@ -1,15 +1,15 @@
 #include <Arduino.h>
 #include <SimpleFOC.h>
 #include <SimpleFOCDrivers.h>
-#include <encoders/flux_observer/FluxObserverSensor.h>
+#include <encoders/MXLEMMING_observer/MXLEMMINGObserverSensor.h>
 #include <RTTStream.h>
 
 RTTStream rtt;
 
-// !!! The Flux Observer needs phase resistance, KV rating and phase inductance parameters to be set
+// !!! The MXLEMMING Observer needs phase resistance, KV rating and phase inductance parameters to be set
 // !!! It also needs current sense 
 BLDCMotor motor = BLDCMotor(15, 0.1664, 17.0, 0.00036858); // Hoverboard Motor
-FluxObserverSensor sensor = FluxObserverSensor(motor);
+MXLEMMINGObserverSensor sensor = MXLEMMINGObserverSensor(motor);
 BLDCDriver6PWM driver = BLDCDriver6PWM(A_PHASE_UH, A_PHASE_UL, A_PHASE_VH, A_PHASE_VL, A_PHASE_WH, A_PHASE_WL);
 
 // current sensor
@@ -69,7 +69,7 @@ void setup(){
 	// link the current sense to the motor
 	motor.linkCurrentSense(&current_sense);
 
-	// !!! The flux observer sensor doesn't need sensor alignment
+	// !!! The MXLEMMING observer sensor doesn't need sensor alignment
 	motor.sensor_direction= Direction::CW;
     motor.zero_electric_angle = 0;
 
