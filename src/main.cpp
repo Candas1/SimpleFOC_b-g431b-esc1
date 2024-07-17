@@ -5,10 +5,13 @@
 #include <RTTStream.h>
 
 RTTStream rtt;
+float target = 0;
 
 // !!! The MXLEMMING Observer needs phase resistance, KV rating and phase inductance parameters to be set
 // !!! It also needs current sense 
-BLDCMotor motor = BLDCMotor(15, 0.1664, 17.0, 0.00036858); // Hoverboard Motor
+//BLDCMotor motor = BLDCMotor(15, 0.1664, 17.0, 0.00036858); // Hoverboard Motor
+BLDCMotor motor = BLDCMotor(7, 0.026f, 320.0f, 0.0000177f); // 5065 320kv
+
 MXLEMMINGObserverSensor sensor = MXLEMMINGObserverSensor(motor);
 BLDCDriver6PWM driver = BLDCDriver6PWM(A_PHASE_UH, A_PHASE_UL, A_PHASE_VH, A_PHASE_VL, A_PHASE_WH, A_PHASE_WL);
 
@@ -18,8 +21,7 @@ LowsideCurrentSense current_sense = LowsideCurrentSense(0.003, -64.0 / 7.0, A_OP
 // Commander interface constructor
 Commander command = Commander(rtt);
 
-void doTarget(char* cmd) { command.scalar(&motor.target, cmd); }
-void doMotor(char* cmd){ command.motor(&motor,cmd); }
+void doTarget(char* cmd) { command.scalar(&target, cmd); }
 
 void setup(){
 	pinMode(LED_BUILTIN, OUTPUT);
@@ -51,7 +53,7 @@ void setup(){
 		}
 	}else{
 		// For openloop angle and velocity modes, use very small limit
-		motor.voltage_limit = driver.voltage_power_supply * 0.05;
+		motor.voltage_limit = driver.voltage_power_supply * 0.03;
 	}
 
     SimpleFOCDebug::enable(&rtt);
@@ -79,18 +81,11 @@ void setup(){
 	motor.target = 0; // unit depends on control mode 
 
 	// add target command T
-	command.add('T',doTarget, "target angle");
-	command.add('M',doMotor,"my motor motion");
+	command.add('T',doTarget, "target ");
 	_delay(100);
 }
 
-float target = 0;
 LowPassFilter LPF_target(0.5);  //  the higher the longer new values need to take effect
-PhaseCurrent_s currents;
-DQCurrent_s dqcurrents;
-float dccurrent, dcpower;
-
-float angle_el;
 
 void loop(){
 
@@ -103,21 +98,10 @@ void loop(){
 		}
 	}else{
 		// For openloop angle and velocity modes, use very small limit
-		motor.voltage_limit = driver.voltage_power_supply * 0.05;
+		motor.voltage_limit = driver.voltage_power_supply * 0.03;
 	}
 
 	motor.loopFOC();
 	motor.move(LPF_target(target));
-	//motor.monitor();
 	command.run();
-
-	if (current_sense.initialized){
-		currents = current_sense.getPhaseCurrents();
-		//dqcurrents = current_sense.getFOCCurrents(motor.electrical_angle);
-		//dqcurrents.q = motor.LPF_current_q(dqcurrents.q);
-		//dqcurrents.d = motor.LPF_current_d(dqcurrents.d);
-	
-		dcpower = 1.5f * (motor.current.q * motor.voltage.q) + 0.8 + (0.1664 + 0.003 * motor.current.q * motor.current.q);
-		dccurrent = dcpower / driver.voltage_power_supply; 
-    }
 }
