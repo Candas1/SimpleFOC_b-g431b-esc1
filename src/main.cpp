@@ -44,6 +44,9 @@ void setup(){
 	motor.controller            = MotionControlType::torque;    // set motion control loop to be used
 	motor.torque_controller     = TorqueControlType::foc_current;
 
+	// Limit the voltage to have enough low side ON time for phase current sampling
+    driver.voltage_limit = driver.voltage_power_supply * 0.95;
+
 	if (motor.controller == MotionControlType::torque || motor.controller == MotionControlType::angle || motor.controller == MotionControlType::velocity){
 		if (motor.torque_controller == TorqueControlType::foc_current || motor.torque_controller == TorqueControlType::dc_current){
 		// When current sensing is used, reduce the voltage limit to have enough low side ON time for phase current sampling  
